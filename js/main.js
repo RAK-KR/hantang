@@ -8,10 +8,10 @@ import { Viewmodel } from './viewmodel.js';
 import { Character, BODY_IDLE, BODY_WALK } from './character.js';
 import { Hud } from './hud.js';
 import { EmoteWheel } from './emoteWheel.js';
-import { EMOTES } from './emotes.js';
+import { EMOTES, EMOTE_TABS } from './emotes.js';
 import { Npc } from './npc.js';
 import { TRICK_ORDER, TRICK_KEYS, KNIFE } from './knifeClips.js';
-import { initAudio, sfx, setVolume } from './audio.js';
+import { initAudio, sfx, setVolume, startMusic, stopMusic } from './audio.js';
 import { clipFromPoses } from './anim.js';
 import { Settings } from './settings.js';
 
@@ -26,7 +26,7 @@ renderer.setClearColor(shared.uFogColor.value);
 const post = new PS1Post(renderer);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(74, 1, 0.05, 60);
+const camera = new THREE.PerspectiveCamera(74, 1, 0.1, 60);
 const world = new World(scene);
 const player = new Player(world);
 const input = new Input(canvas);
@@ -69,13 +69,15 @@ function playEmote(e) {
     cam.orbitPitch = -0.08;
     vm.stopLeft();
   } else {
+    if (cam.emote) { cam.emote = null; npc.stopMusicEmote(); }
     vm.playLeft(e.fp);
     if (e.fpR) vm.playRight(e.fpR);
   }
   bodyEmote = e;
+  if (e.music) startMusic(e.music, e.bpm); else stopMusic();
   body.anim.play(e.body, {
     blend: 0.15,
-    onEnd: () => { bodyEmote = null; if (cam.emote === e) cam.emote = null; },
+    onEnd: () => { bodyEmote = null; if (cam.emote === e) cam.emote = null; if (e.music) stopMusic(); },
   });
   npc.react(e);
   hud.showToast(e.name);
@@ -84,13 +86,15 @@ function stopBodyEmote() {
   if (!bodyEmote) return;
   bodyEmote = null;
   cam.emote = null;
+  stopMusic();
+  npc.stopMusicEmote();
   body.anim.play(BODY_IDLE, { blend: 0.2 });
 }
 body.anim.onEvent = (type, arg) => {
   // 전신 감정표현 소리는 3인칭에서만 (1인칭은 손 애니메이션 쪽에서 남)
   if (type === 'sfx' && (cam.tp > 0.5 || bodyEmote?.tp)) sfx(arg.name || arg, arg.v ?? 1, 0);
 };
-const wheel = new EmoteWheel(EMOTES, playEmote);
+const wheel = new EmoteWheel(EMOTE_TABS, playEmote);
 
 vm.onTrick = (name) => hud.showToast(name);
 player.onStep = (v) => sfx('step', v * 0.6);
@@ -141,6 +145,8 @@ function step(dt) {
   let clickUsed = false;
   if (active && input.wasPressed('emote')) wheel.show();
   if (wheel.open) {
+    // 휠을 연 채로 숫자 → 탭 전환 (칼 트릭 숫자키는 휠이 열려 있을 땐 막힘)
+    for (let i = 0; i < EMOTE_TABS.length; i++) if (input.wasPressed('Digit' + (i + 1))) wheel.setTab(i);
     wheel.move(mdx, mdy);
     if (input.wasReleased('emote') || input.mousePressed[0]) { clickUsed = input.mousePressed[0]; wheel.commit(); }
     else if (input.mousePressed[2] || !active) wheel.cancel();

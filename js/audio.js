@@ -140,3 +140,139 @@ export function sfx(name, v, pan) {
   if (!ctx || !SFX[name]) return;
   SFX[name](v, pan);
 }
+
+// ---------------- 배경 비트(전부 직접 합성한 오리지널 루프) ----------------
+// 16분음표 스텝 시퀀서. 스타일마다 드럼 패턴·베이스·코드가 다름 (코드 진행은 흔한 진행만 사용)
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const S = (str) => str.split('').map((c) => c === 'x');   // "x...x..." → 스텝 배열
+
+const STYLES = {
+  // 유로비트: 4비트 킥, 옥타브 베이스, 스탭 + 아르페지오
+  parapara: {
+    kick: S('x...x...x...x...'), clap: S('....x.......x...'), hatO: S('..x...x...x...x.'), hatC: S('x.x.x.x.x.x.x.x.'),
+    chords: [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]],
+    bass: (s) => (s % 2 === 0 ? (s % 4 === 2 ? 12 : 0) : null), bassType: 'sawtooth', bassCut: 900, bassLen: 1.8,
+    stab: S('x..x..x...x.x...'), stabType: 'square', arp: [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 1, 0, 2, 1, 2],
+  },
+  // 저지클럽: 킥 5연타 패턴, 부드러운 패드
+  jersey: {
+    kick: S('x..x..x.x.x.....'), clap: S('....x.......x...'), hatC: S('x.xxx.xxx.xxx.xx'),
+    chords: [[65, 69, 72, 76], [64, 67, 71, 74], [62, 65, 69, 72], [60, 64, 67, 71]],
+    bass: (s) => (s === 0 || s === 6 || s === 10 ? 0 : null), bassType: 'sine', bassCut: 500, bassLen: 2.5,
+    stab: S('x.......x.......'), stabType: 'triangle', stabLen: 7, arp: null, bell: S('......x.......x.'),
+  },
+  // 트랩: 하프타임 스네어, 16분 하이햇, 808 베이스
+  trap: {
+    kick: S('x......x..x.....'), clap: S('........x.......'), hatC: S('xxxxxxxxxxxxxxxx'), hatRoll: true,
+    chords: [[60, 63, 67], [56, 60, 63], [63, 67, 70], [58, 62, 65]],
+    bass: (s) => (s === 0 || s === 7 || s === 10 ? 0 : null), bassType: 'sine', bassCut: 300, bassLen: 3.5, bassSlide: true,
+    stab: S('x...............'), stabType: 'sawtooth', stabLen: 10, arp: null, bell: S('..x.......x.....'),
+  },
+  // 하우스: 4비트, 오프비트 오픈햇과 베이스, 피아노 스탭
+  house: {
+    kick: S('x...x...x...x...'), clap: S('....x.......x...'), hatO: S('..x...x...x...x.'), hatC: S('.x.x.x.x.x.x.x.x'),
+    chords: [[57, 60, 64, 67], [62, 65, 69, 72], [60, 64, 67, 71], [55, 59, 62, 65]],
+    bass: (s) => (s % 4 === 2 ? 0 : null), bassType: 'square', bassCut: 600, bassLen: 1.5,
+    stab: S('..x...x.....x...'), stabType: 'triangle', stabLen: 1.6, arp: null,
+  },
+  // 디스코: 옥타브 베이스 8분, 스트링 스탭
+  disco: {
+    kick: S('x...x...x...x...'), clap: S('....x.......x...'), hatO: S('..x...x...x...x.'), hatC: S('x.x.x.x.x.x.x.x.'),
+    chords: [[62, 65, 69, 72], [55, 59, 62, 65], [60, 64, 67, 71], [57, 61, 64, 67]],
+    bass: (s) => (s % 2 === 0 ? (s % 4 === 2 ? 12 : 0) : null), bassType: 'sawtooth', bassCut: 1200, bassLen: 1.6,
+    stab: S('x.....x...x.....'), stabType: 'sawtooth', stabLen: 3, arp: null,
+  },
+  // 일렉트로: 각진 사각파 베이스, 삑삑 소리
+  electro: {
+    kick: S('x.....x...x.....'), clap: S('....x.......x...'), hatC: S('x.x.x.x.x.x.x.x.'),
+    chords: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [55, 59, 62]],
+    bass: (s) => ([0, 3, 6, 8, 11, 14].includes(s) ? (s === 8 ? 12 : 0) : null), bassType: 'square', bassCut: 800, bassLen: 1.2,
+    stab: null, arp: [0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2], arpType: 'square', bell: S('...x.....x....x.'),
+  },
+  // 트로트 뽕짝: 박마다 킥, 엇박마다 스네어, 근음-5도 베이스
+  trot: {
+    kick: S('x...x...x...x...'), clap: S('..x...x...x...x.'), hatC: S('x.x.x.x.x.x.x.x.'),
+    chords: [[57, 60, 64], [62, 65, 69], [64, 68, 71], [57, 60, 64]],
+    bass: (s) => (s % 4 === 0 ? (s % 8 === 4 ? 7 : 0) : null), bassType: 'triangle', bassCut: 900, bassLen: 2.5,
+    stab: S('..x...x...x...x.'), stabType: 'square', stabLen: 1.2, arp: null,
+  },
+};
+
+function kick(t, g) {
+  const o = ctx.createOscillator(); const a = ctx.createGain();
+  o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  a.gain.setValueAtTime(0.9 * g, t); a.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+  o.connect(a).connect(musicBus); o.start(t); o.stop(t + 0.22);
+}
+function hat(t, g, open) {
+  const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+  const a = ctx.createGain(); const d = open ? 0.12 : 0.035;
+  a.gain.setValueAtTime(0.25 * g, t); a.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(f).connect(a).connect(musicBus); s.start(t, Math.random() * 0.3); s.stop(t + d + 0.02);
+}
+function clapHit(t, g) {
+  for (let i = 0; i < 3; i++) {
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1500; f.Q.value = 1.1;
+    const a = ctx.createGain(); const tt = t + i * 0.012;
+    a.gain.setValueAtTime(0.35 * g, tt); a.gain.exponentialRampToValueAtTime(0.0001, tt + (i === 2 ? 0.14 : 0.03));
+    s.connect(f).connect(a).connect(musicBus); s.start(tt, Math.random() * 0.3); s.stop(tt + 0.16);
+  }
+}
+function synth(t, freq, dur, g, type = 'sawtooth', cut = 2400, detune = 0, slideTo = 0) {
+  const a = ctx.createGain(); const f = ctx.createBiquadFilter();
+  f.type = 'lowpass'; f.frequency.setValueAtTime(cut, t); f.frequency.exponentialRampToValueAtTime(cut * 0.35, t + dur);
+  a.gain.setValueAtTime(0.0001, t); a.gain.exponentialRampToValueAtTime(g, t + 0.005); a.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  f.connect(a).connect(musicBus);
+  for (const d of detune ? [-detune, detune] : [0]) {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t); o.detune.value = d;
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur * 0.6);
+    o.connect(f); o.start(t); o.stop(t + dur + 0.02);
+  }
+}
+
+let musicBus = null;
+let music = null;
+export function startMusic(name, bpm = 120) {
+  if (!ctx) return;
+  stopMusic();
+  const st = STYLES[name];
+  if (!st) return;
+  musicBus = ctx.createGain(); musicBus.gain.value = 0.32; musicBus.connect(master);
+  const step = 60 / bpm / 4;
+  const t0 = ctx.currentTime + 0.03;
+  const bus = musicBus;
+  let n = 0;
+  const tick = () => {
+    if (bus !== musicBus) return;
+    while (t0 + n * step < ctx.currentTime + 0.12) {
+      const t = t0 + n * step, s = n % 16, bar = Math.floor(n / 16) % 4, ch = st.chords[bar];
+      if (st.kick[s]) kick(t, 1);
+      if (st.clap[s]) clapHit(t, 1);
+      if (st.hatO && st.hatO[s]) hat(t, 1, true);
+      else if (st.hatC && st.hatC[s]) hat(t, s % 2 ? 0.35 : 0.5, false);
+      if (st.hatRoll && bar % 2 === 1 && s >= 12) hat(t + step / 2, 0.3, false);
+      const bo = st.bass(s);
+      if (bo !== null && bo !== undefined) {
+        const f = mtof(ch[0] - 24 + bo);
+        synth(t, f, step * st.bassLen, 0.24, st.bassType, st.bassCut, 0, st.bassSlide && s === 10 ? f * 0.75 : 0);
+      }
+      if (st.stab && st.stab[s]) for (const m of ch) synth(t, mtof(m), step * (st.stabLen || 1.5), 0.045, st.stabType, 3000, 9);
+      if (st.arp) synth(t, mtof(ch[st.arp[s] % ch.length] + 12), step * 0.9, 0.025, st.arpType || 'triangle', 5000);
+      if (st.bell && st.bell[s]) synth(t, mtof(ch[ch.length - 1] + 12), step * 3, 0.03, 'sine', 8000);
+      n++;
+    }
+    music.timer = setTimeout(tick, 25);
+  };
+  music = { timer: 0, bus };
+  tick();
+}
+export function stopMusic() {
+  if (!music) return;
+  clearTimeout(music.timer);
+  const b = music.bus;
+  b.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+  setTimeout(() => b.disconnect(), 600);
+  music = null; musicBus = null;
+}

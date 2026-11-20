@@ -33,13 +33,13 @@ export class World {
     const ceil = ps1Mat({ map: tex('ceiling') });
     const wood = ps1Mat({ map: tex('wood'), spec: 0.15 });
     const metal = ps1Mat({ map: tex('metal'), spec: 0.4 });
-    const carpet = ps1Mat({ map: tex('carpet') });
+    const carpet = ps1Mat({ map: tex('carpet'), decal: true });
 
     // 바닥(잘게 나눠서 아핀 왜곡이 과하지 않게)
     const fg = uvScale(new THREE.PlaneGeometry(20, 16, 20, 16), 10, 8).rotateX(-PI2);
     S.add(mesh(fg, marble));
     const cg = uvScale(new THREE.PlaneGeometry(2.4, 10, 2, 10), 2, 8).rotateX(-PI2);
-    const cm = mesh(cg, carpet); cm.position.set(0, 0.005, 3); S.add(cm);
+    const cm = mesh(cg, carpet); cm.position.set(0, 0.012, 3); S.add(cm);
     // 천장
     const ce = uvScale(new THREE.PlaneGeometry(20, 16, 10, 8), 10, 8).rotateX(PI2);
     const cem = mesh(ce, ceil); cem.position.y = H; S.add(cem);
@@ -66,7 +66,7 @@ export class World {
     this.colliders.push({ minX: -9.6, maxX: 9.6, minZ: -3.5, maxZ: -2.6, top: 1.1 }); // 카운터 전체 막기
 
     // 간판
-    const sign = mesh(new THREE.PlaneGeometry(4, 1), ps1Mat({ map: tex('sign'), emissive: 0.5 }));
+    const sign = mesh(new THREE.PlaneGeometry(4, 1), ps1Mat({ map: tex('sign'), emissive: 0.5, decal: true }));
     sign.position.set(0, 2.95, -2.98); S.add(sign);
 
     // 금고 문
@@ -86,7 +86,7 @@ export class World {
       this.box(1.6, 0.75, 0.8, x, 0.375, -5.5, wood);
       const mon = mesh(new THREE.BoxGeometry(0.45, 0.35, 0.3), ps1Mat({ color: 0xcfcab8 }));
       mon.position.set(x, 0.95, -5.6); S.add(mon);
-      const scr = mesh(new THREE.PlaneGeometry(0.38, 0.26), ps1Mat({ color: 0x3a6a8a, emissive: 0.7 }));
+      const scr = mesh(new THREE.PlaneGeometry(0.38, 0.26), ps1Mat({ color: 0x3a6a8a, emissive: 0.7, decal: true }));
       scr.position.set(x, 0.96, -5.44); S.add(scr);
     }
 
@@ -113,7 +113,7 @@ export class World {
 
     // 포스터
     for (const [x, z, ry] of [[9.97, 2.5, -PI2], [9.97, -0.5, -PI2], [-9.97, 1.5, PI2]]) {
-      const p = mesh(new THREE.PlaneGeometry(0.8, 1.2), ps1Mat({ map: tex('poster') }));
+      const p = mesh(new THREE.PlaneGeometry(0.8, 1.2), ps1Mat({ map: tex('poster'), decal: true }));
       p.position.set(x, 1.8, z); p.rotation.y = ry; S.add(p);
     }
 

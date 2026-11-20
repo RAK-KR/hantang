@@ -4,6 +4,7 @@
 import { clipFromPoses } from './anim.js';
 import { HANDS } from './hand.js';
 import { L_BASE } from './knifeClips.js';
+import { DANCES } from './dances.js';
 
 const PI = Math.PI;
 const sfx = (t, name, v = 1) => [t, 'sfx', { name, v }];
@@ -249,39 +250,32 @@ BD.surrender = clipFromPoses({
   events: [sfx(0.2, 'whoosh', 0.6), sfx(0.9, 'whistle', 0.7)],
 });
 
-// 춤 – 동네 아저씨 디스코(무릎 바운스 + 왼손 하늘/땅 찌르기 + 칼 든 오른손은 허리)
-{
-  const base = { ruX: 0.35, ruZ: 0.75, ruY: -0.6, reX: 1.75, rwX: 0.2, ...RH('grip') };
-  const up = { luX: 2.4, luZ: 0.55, luY: 0.0, leX: 0.15, lwX: 0.0, ...LH('point'), sry: -0.18, srz: 0.08, nry: -0.25, nrx: -0.12 };
-  const down = { luX: -0.25, luZ: 0.35, luY: 0.4, leX: 0.1, lwX: 0.0, ...LH('point'), sry: 0.2, srz: -0.08, nry: 0.25, nrx: 0.15 };
-  const bounce = (t, d) => ({ hy: d ? -0.06 : 0.0, lkX: d ? 0.35 : 0.06, rkX: d ? 0.35 : 0.06, ltX: d ? 0.18 : 0.02, rtX: d ? 0.18 : 0.02, hrz: 0 });
-  BD.dance = clipFromPoses({
-    name: 'bdDance', duration: 2.0, loop: true,
-    poses: [
-      [0.0, { ...base, ...up, ...bounce(0, 1), hrx: 0, hry: 0.15, ltZ: 0.1, rtZ: 0.1 }],
-      [0.25, { ...bounce(0, 0), hry: 0.2 }],
-      [0.5, { ...down, ...bounce(0, 1), hry: -0.15 }],
-      [0.75, { ...bounce(0, 0), hry: -0.2 }],
-      [1.0, { ...up, ...bounce(0, 1), hry: 0.15 }],
-      [1.25, { ...bounce(0, 0), hry: 0.2, rfX: 0.25, rtX: 0.3 }],
-      [1.5, { ...down, ...bounce(0, 1), hry: -0.15, rfX: 0, rtX: 0.18 }],
-      [1.75, { ...bounce(0, 0), hry: -0.2, lfX: 0.25, ltX: 0.3 }],
-      [2.0, { ...up, ...bounce(0, 1), hry: 0.15, lfX: 0, ltX: 0.18 }],
-    ],
-    events: [sfx(0.0, 'pat', 0.35), sfx(0.5, 'pat', 0.35), sfx(1.0, 'pat', 0.35), sfx(1.5, 'pat', 0.35)],
-  });
-}
-
 // ===================== 목록 =====================
-export const EMOTES = [
-  { id: 'thumb', name: '따봉', icon: '👍', desc: '엄지 척', fp: FP.thumb, body: BD.thumb, npc: ['ㅇㅋ 형님', '따봉은 무슨...', '좋아 좋아'] },
-  { id: 'wave', name: '인사', icon: '👋', desc: '손 흔들기', fp: FP.wave, body: BD.wave, npc: ['어 왔냐', '안녕하세요~ 강도입니다', '손 흔들 때가 아니야'] },
-  { id: 'point', name: '저기!', icon: '👉', desc: '가리키기', fp: FP.point, body: BD.point, npc: ['어디? 금고?', '저기 뭐!', 'CCTV 말하는 거지?'] },
-  { id: 'shush', name: '쉿', icon: '🤫', desc: '조용히', fp: FP.shush, body: BD.shush, npc: ['(속닥) 알겠다고...', '네가 제일 시끄러워', '(끄덕)'] },
-  { id: 'money', name: '돈 내놔', icon: '💰', desc: '손가락 비비기', fp: FP.money, body: BD.money, npc: ['그건 은행원한테 해', '나도 없어', '반띵이다?'] },
-  { id: 'face', name: '이마짚기', icon: '🤦', desc: '하...', fp: FP.face, body: BD.face, npc: ['내가 뭘 했다고', '하... 나도', '복면 쓰고 이마짚기 ㅋㅋ'] },
-  { id: 'surrender', name: '항복', icon: '🙌', desc: '전신 · 3인칭', tp: true, body: BD.surrender, npc: ['벌써?!', '경찰 아직 안 왔어', '나도 같이 들어?'] },
-  { id: 'dance', name: '춤', icon: '🕺', desc: '전신 · 움직이면 멈춤', tp: true, body: BD.dance, maxTime: 8, npc: ['지금 이럴 때야?', '...박자는 좋네', '나도 출까'] },
+const D = (id, name, icon, desc, npc) => ({
+  id, name, icon, desc, tp: true, dance: true, body: DANCES[id].clip, music: DANCES[id].music, bpm: DANCES[id].bpm, npcDelay: 0, npc,
+});
+
+// 탭 1: 손 제스처 / 탭 2: 춤 – 휠을 연 채로 숫자 1, 2 로 탭 전환
+export const EMOTE_TABS = [
+  { name: '제스처', list: [
+    { id: 'thumb', name: '따봉', icon: '👍', desc: '엄지 척', fp: FP.thumb, body: BD.thumb, npc: ['ㅇㅋ 형님', '따봉은 무슨...', '좋아 좋아'] },
+    { id: 'wave', name: '인사', icon: '👋', desc: '손 흔들기', fp: FP.wave, body: BD.wave, npc: ['어 왔냐', '안녕하세요~ 강도입니다', '손 흔들 때가 아니야'] },
+    { id: 'point', name: '저기!', icon: '👉', desc: '가리키기', fp: FP.point, body: BD.point, npc: ['어디? 금고?', '저기 뭐!', 'CCTV 말하는 거지?'] },
+    { id: 'shush', name: '쉿', icon: '🤫', desc: '조용히', fp: FP.shush, body: BD.shush, npc: ['(속닥) 알겠다고...', '네가 제일 시끄러워', '(끄덕)'] },
+    { id: 'money', name: '돈 내놔', icon: '💰', desc: '손가락 비비기', fp: FP.money, body: BD.money, npc: ['그건 은행원한테 해', '나도 없어', '반띵이다?'] },
+    { id: 'face', name: '이마짚기', icon: '🤦', desc: '하...', fp: FP.face, body: BD.face, npc: ['내가 뭘 했다고', '하... 나도', '복면 쓰고 이마짚기 ㅋㅋ'] },
+    { id: 'surrender', name: '항복', icon: '🙌', desc: '전신 · 3인칭', tp: true, body: BD.surrender, npc: ['벌써?!', '경찰 아직 안 왔어', '나도 같이 들어?'] },
+  ] },
+  { name: '춤', list: [
+    D('parapara', '파라파라', '🕺', '유로비트 · 팔 꽂기', ['파라파라나 춰야겠다...', '은행에서 이걸 춘다고?', '나도 안다 이거!']),
+    D('heart', '하트 시그널', '💗', '걸그룹 포인트 안무 풍', ['형... 그 복면으로?', '꺄악 (영혼 없음)', '하트는 금고한테 해']),
+    D('sync', '칼군무', '🔥', '보이그룹 퍼포먼스 풍', ['각 잡혔다...', '데뷔해도 되겠는데', '나도 맞춰 볼게']),
+    D('shuffle', '셔플', '👟', '러닝맨 스텝', ['발 바쁘다 발', '도망칠 때 그렇게 뛰어', '클럽 아니야 여기']),
+    D('disco', '디스코', '🪩', '하늘 찌르기', ['70년대냐고', '조명 어디 갔어', '쿵짝쿵짝']),
+    D('robot', '로봇', '🤖', '끊어지는 팔', ['삐빅 강도 로봇', 'CCTV인 척하는 거지?', '기름칠 좀 해']),
+    D('bus', '관광버스', '🚌', '트로트 어깨춤', ['삼촌 여기 은행이야', '어깨가 절로 들썩', '노래방 가자 끝나고']),
+  ] },
 ];
+export const EMOTES = EMOTE_TABS.flatMap((t) => t.list);
 
 export { FP, BD };

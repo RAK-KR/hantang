@@ -10,7 +10,7 @@ import { Animator, clipFromPoses } from './anim.js';
 const FINGER = ['iB', 'iD', 'mB', 'mD', 'rB', 'rD', 'pB', 'pD', 'sp', 'tF', 'tA', 'tC'];
 
 export const BODY_BASE = {
-  hy: 0, hrx: 0, hry: 0, hrz: 0,
+  hx: 0, hy: 0, hrx: 0, hry: 0, hrz: 0,
   srx: 0.03, sry: 0, srz: 0,
   nrx: 0, nry: 0, nrz: 0,
   luX: 0.05, luY: 0, luZ: 0.12, leX: 0.2, lwX: 0, lwY: 0, lwZ: 0,
@@ -120,6 +120,7 @@ export class Character {
 
   apply(p) {
     this.hips.position.y = 0.92 + p.hy;
+    this.hips.position.x = p.hx;
     this.hips.rotation.set(p.hrx, p.hry, p.hrz);
     this.spine.rotation.set(p.srx, p.sry, p.srz);
     this.neck.rotation.set(p.nrx * 0.4, p.nry * 0.4, p.nrz * 0.4);

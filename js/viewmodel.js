@@ -1,7 +1,7 @@
 // 1인칭 뷰모델 – 오른손(발리송) + 왼손(감정표현), 팔뚝은 팔꿈치 고정점까지 자동으로 이어짐
 import * as THREE from 'three';
 import { Hand } from './hand.js';
-import { Balisong } from './balisong.js';
+import { Balisong, PIN } from './balisong.js';
 import { Animator } from './anim.js';
 import { ps1Mat, mesh } from './ps1.js';
 import { tex } from './textures.js';
@@ -10,7 +10,7 @@ import { sfx } from './audio.js';
 
 const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0), AX_Z = new THREE.Vector3(0, 0, 1);
 const AX_PIN = new THREE.Vector3(-1, 1, 0).normalize();   // 대각선 그립에서 칼 핀 축(손 좌표)
-const _qa = new THREE.Quaternion(), _va = new THREE.Vector3();
+const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _va = new THREE.Vector3(), _vb = new THREE.Vector3();
 const FINGER_CH = ['iB', 'iD', 'mB', 'mD', 'rB', 'rD', 'pB', 'pD', 'sp', 'tF', 'tA', 'tC'];
 
 function makeForearm(mat) {
@@ -67,7 +67,7 @@ export class Viewmodel {
     this.elbowL = new THREE.Vector3(-0.44, -0.42, -0.2);
 
     this.animR = new Animator(R_BASE);
-    this.animR.wrap = ['krx', 'kry', 'krz'];
+    this.animR.wrap = ['krx', 'kry', 'krz', 'sy'];
     this.animL = new Animator(L_BASE);
     this.animR.onEvent = (type, arg) => this._event(type, arg, 0.35);
     this.animL.onEvent = (type, arg) => this._event(type, arg, -0.35);
@@ -199,6 +199,22 @@ export class Viewmodel {
     this.kOff.position.set(pr.kox, pr.koy, pr.koz);
     this.knife.set(pr.a, pr.b);
     this.knife.root.visible = pr.kv > 0.5;
+    // hb: 잡는 손잡이 (0 = 세이프 핸들 A, 1 = 바이트 핸들 B) – B를 잡으면 칼 전체를 B 기준으로 다시 배치
+    // sy: 칼 길이축 회전(공중 헬리콥터), cmy: 그 회전 중심
+    const hb = pr.hb || 0, sy = pr.sy || 0;
+    const h2 = PIN * 2;
+    const th = -hb * (pr.a + pr.b);
+    _qa.setFromAxisAngle(AX_Z, th);
+    _qb.setFromAxisAngle(AX_Y, sy);
+    const kr = this.knife.root;
+    kr.quaternion.copy(_qa).multiply(_qb);
+    kr.position.set(hb * h2 * Math.cos(pr.b), -hb * h2 * Math.sin(pr.b), 0);
+    if (sy) {
+      _vb.set(-PIN, pr.cmy ?? -0.035, 0);
+      _va.copy(_vb).applyQuaternion(_qb);
+      _vb.sub(_va).applyQuaternion(_qa);
+      kr.position.add(_vb);
+    }
 
     this.wristL.position.set(pl.x, pl.y, pl.z);
     this.wristL.rotation.set(pl.rx, pl.ry, pl.rz);

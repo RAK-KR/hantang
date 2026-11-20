@@ -117,6 +117,8 @@ export function ps1Mat(o = {}) {
   });
   m.vertexColors = false;
   m.userData.ps1 = true;
+  // 바닥/벽에 붙은 장식(카펫, 포스터, 간판)은 항상 앞에 그려지게 – 깜빡임(Z-파이팅) 방지
+  if (o.decal) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; }
   return m;
 }
 

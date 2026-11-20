@@ -22,7 +22,11 @@ export class Npc {
     this._v = new THREE.Vector3();
   }
   react(e) {
-    this.pending = { e, t: 0.45 };
+    this.pending = { e, t: e.npcDelay ?? 0.45 };
+  }
+  // 플레이어가 춤을 멈추면 같이 멈춤
+  stopMusicEmote() {
+    if (this.char.anim.clip && this.cur?.music) { this.busy = false; this.char.anim.play(BODY_IDLE, { blend: 0.25 }); }
   }
   update(dt, player) {
     // 플레이어 쪽으로 몸을 천천히 돌림
@@ -39,12 +43,11 @@ export class Npc {
         const e = this.pending.e;
         this.pending = null;
         this.busy = true;
+        this.cur = e;
         this.char.anim.play(e.body, {
           blend: 0.15,
           onEnd: () => { this.busy = false; this.char.anim.play(BODY_IDLE, { blend: 0.25 }); },
         });
-        // 반복되는 춤은 너무 길지 않게 끊기
-        if (e.body.loop) setTimeout(() => { if (this.char.anim.clip === e.body) { this.busy = false; this.char.anim.play(BODY_IDLE, { blend: 0.3 }); } }, 4200);
         const lines = e.npc || [];
         if (lines.length) this.say(lines[Math.floor(Math.random() * lines.length)]);
       }

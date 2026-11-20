@@ -39,7 +39,7 @@ export const R_BASE = {
   ...HANDS.grip,
   ...KG,
   cx: 0, cy: 0, cz: 0,
-  a: 0, b: 0, kv: 1,
+  a: 0, b: 0, kv: 1, hb: 0, sy: 0, cmy: -0.035,
 };
 export const L_BASE = {
   x: -0.3, y: -0.8, z: -0.3, rx: 0.8, ry: 1.2, rz: 0.6, tw: 0, fx: 0, fl: 0,
@@ -118,116 +118,198 @@ KNIFE.close = clipFromPoses({
   events: [sfx(0.13, 'swish', 0.7), sfx(0.2, 'clack', 0.95), sfx(0.31, 'swish', 0.55), sfx(0.37, 'clack', 0.8), sfx(0.44, 'catch', 0.4)],
 });
 
-// ------------------------------------------------------------------
-// 팬 회전 – 검지를 축으로 펼친 칼을 두 바퀴 돌리고 다시 쥠
-// ------------------------------------------------------------------
-{
-  const IDX = [0.03, 0.118, 0.012];           // 검지 가운데 마디 근처(손 좌표)
-  const spin = (rz) => ({ ...K([KR_AXLE[0], KR_AXLE[1], rz], COM_OPEN, null), kpx: IDX[0], kpy: IDX[1], kpz: IDX[2] });
-  const r0 = KR_AXLE[2];
-  KNIFE.twirl = clipFromPoses({
-    name: 'twirl', duration: 1.3, meta: { from: 'open', to: 'open', label: '팬 회전' },
-    poses: [
-      [0.0, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip'), ...KG, ...OPEN }],
-      [0.1, { ...W(-0.01, 0.01, 0, { tw: -0.25, fx: -0.15 }), ...H('catch') }],
-      [0.2, { ...spin(r0 + 0.25), ...H('axle'), tw: -0.4, fx: -0.25, fl: 0 }],
-      [0.36, { krz: [r0 - PI * 0.7, 'i'] }],
-      [0.84, { krz: [r0 - PI * 3.5, 'l'] }],
-      [1.0, { ...spin(r0 - TAU * 2 + 0.25), krz: [r0 - TAU * 2 + 0.25, 'o'], tw: -0.35, fx: -0.2 }],
-      [1.08, { ...KG, krz: KG.krz - TAU * 2, ...H('catch'), tw: -0.1 }],
-      [1.13, { ...H('grip', { iB: 0.94 }), fl: 0.08 }],
-      [1.3, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip') }],
-    ],
-    events: [sfx(0.3, 'swish', 0.5), sfx(0.5, 'swish', 0.75), sfx(0.66, 'swish', 0.8), sfx(0.82, 'swish', 0.7), sfx(0.95, 'swish', 0.4), sfx(1.1, 'catch', 0.7), sfx(1.12, 'tick', 0.5)],
-  });
+// ==================================================================
+// 트릭 빌더 – 키마다 전체 포즈를 기록해서(유지 구간이 풀리지 않음) 기술을 이어 붙임
+// ==================================================================
+const CH = Object.keys(R_BASE);
+class Seq {
+  constructor(name, meta) {
+    this.name = name; this.meta = meta;
+    this.t = 0; this.poses = []; this.events = [];
+    this.cur = { ...R_BASE };
+    this.turn = 0;     // 칼 평면 회전 누적(2π 단위)
+    this.spin = 0;     // 길이축 회전 누적
+    this.at(0, {});
+  }
+  at(dt, ch) {
+    this.t += dt;
+    const ease = {};
+    for (const k in ch) {
+      const v = ch[k];
+      if (Array.isArray(v)) { this.cur[k] = v[0]; ease[k] = v[1]; } else this.cur[k] = v;
+    }
+    const pose = {};
+    for (const k of CH) pose[k] = ease[k] ? [this.cur[k], ease[k]] : this.cur[k];
+    // 같은 시각 키가 겹치지 않게
+    if (this.poses.length && this.poses[this.poses.length - 1][0] >= this.t - 1e-4) this.poses.pop();
+    this.poses.push([this.t, pose]);
+    return this;
+  }
+  sfx(name, v = 1, off = 0) { this.events.push([this.t + off, 'sfx', { name, v }]); return this; }
+  grip() { return { ...KG, krz: KG.krz + this.turn }; }
+  build() {
+    return clipFromPoses({ name: this.name, duration: this.t, meta: this.meta, poses: this.poses, events: this.events });
+  }
 }
 
-// ------------------------------------------------------------------
-// 에어리얼 – 위로 던져 두 바퀴 돌려 받기
-// ------------------------------------------------------------------
-{
-  const C = K(KR_GRIP, COM_OPEN);           // 무게중심을 축으로 도는 자세(시작 시 위치는 그립과 동일)
-  const r0 = KR_GRIP[2];
-  KNIFE.aerial = clipFromPoses({
-    name: 'aerial', duration: 1.25, meta: { from: 'open', to: 'open', label: '에어리얼' },
-    poses: [
-      [0.0, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip'), ...KG, cx: 0, cy: 0, cz: 0, ...OPEN }],
-      [0.12, { ...W(0.005, -0.03, 0.01, { fx: 0.18 }), fl: 0.12, ...C }],
-      [0.24, { ...W(-0.005, 0.03, -0.01, { fx: -0.2 }), fl: -0.15, ...H('grip') }],
-      [0.3, { ...H('open'), cy: 0.04, cx: -0.005, krz: r0 - 0.5 }],
-      [0.58, { cy: [0.24, 'o'], cx: -0.02, cz: -0.02 }],
-      [0.86, { cy: [0.03, 'i'], cx: -0.004, cz: 0, krz: [r0 - TAU * 2 + 0.25, 'l'], ...W(0, 0.012, 0, { fx: -0.1 }), ...H('catch') }],
-      [0.92, { cy: 0, cx: 0, ...KG, krz: KG.krz - TAU * 2, ...W(0, -0.022, 0.005, { fx: 0.12 }), ...H('grip', { iB: 0.95 }) }],
-      [1.02, { ...W(0, 0.004, 0, { fx: -0.03 }) }],
-      [1.25, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip') }],
-    ],
-    events: [sfx(0.27, 'swish', 0.8), sfx(0.45, 'swish', 0.55), sfx(0.62, 'swish', 0.6), sfx(0.78, 'swish', 0.5), sfx(0.91, 'catch', 1), sfx(0.92, 'clack', 0.45)],
-  });
+// ---------- 기본 동작 조각 ----------
+// 세이프 핸들(A)을 잡고 접기 / 펼치기
+function closeA(s, k = 1, hi = 0) {
+  s.at(0.05 * k, { fl: -0.22, ...H('catch') });
+  s.sfx('swish', 0.5, 0.03).at(0.11 * k, { a: [PI, 'i'], fl: [0.3, 'o'], y: B.y + hi }).sfx('clack', 0.9);
+  s.at(0.025, { a: PI - 0.08, ...H('pinch') }).at(0.025, { a: PI });
+  s.sfx('swish', 0.4, 0.02).at(0.1 * k, { b: [-PI, 'i'], fl: [-0.3, 'o'] }).sfx('clack', 0.8);
+  s.at(0.02, { b: -PI + 0.07 }).at(0.02, { b: -PI });
 }
+function openA(s, k = 1, hi = 0) {
+  s.at(0.05 * k, { fl: 0.24, ...H('pinch') });
+  s.sfx('swish', 0.45, 0.03).at(0.1 * k, { b: [0, 'i'], fl: [-0.33, 'o'], y: B.y + hi }).sfx('clack', 0.75);
+  s.at(0.02, { b: -0.12 }).at(0.025, { b: 0 });
+  s.sfx('swish', 0.6, 0.03).at(0.11 * k, { a: [0, 'i'], fl: [0.3, 'o'], ...H('catch') }).sfx('clack', 1);
+  s.at(0.02, { a: 0.07 }).at(0.025, { a: 0, ...H('grip', { iB: 0.93 }) });
+}
+// 바이트 핸들(B)을 잡고 접기 / 펼치기 – 반대쪽 손잡이가 돌아가서 칼이 번갈아 번쩍임
+function closeB(s, k = 1, hi = 0) {
+  s.at(0.05 * k, { fl: 0.22, ...H('catch') });
+  s.sfx('swish', 0.5, 0.03).at(0.11 * k, { b: [-PI, 'i'], fl: [-0.3, 'o'], y: B.y + hi }).sfx('clack', 0.9);
+  s.at(0.025, { b: -PI + 0.08, ...H('pinch') }).at(0.025, { b: -PI });
+  s.sfx('swish', 0.4, 0.02).at(0.1 * k, { a: [PI, 'i'], fl: [0.3, 'o'] }).sfx('clack', 0.8);
+  s.at(0.02, { a: PI - 0.07 }).at(0.02, { a: PI });
+}
+function openB(s, k = 1, hi = 0) {
+  s.at(0.05 * k, { fl: -0.24, ...H('pinch') });
+  s.sfx('swish', 0.45, 0.03).at(0.1 * k, { a: [0, 'i'], fl: [0.33, 'o'], y: B.y + hi }).sfx('clack', 0.75);
+  s.at(0.02, { a: 0.12 }).at(0.025, { a: 0 });
+  s.sfx('swish', 0.6, 0.03).at(0.11 * k, { b: [0, 'i'], fl: [-0.3, 'o'], ...H('catch') }).sfx('clack', 1);
+  s.at(0.02, { b: -0.07 }).at(0.025, { b: 0, ...H('grip', { iB: 0.93 }) });
+}
+// 잡는 손잡이 바꾸기(완전히 펼쳤거나 접혔을 때만)
+const toB = (s) => s.at(0.035, { hb: 1, ...H('catch') }).sfx('tick', 0.35);
+const toA = (s) => s.at(0.035, { hb: 0, ...H('catch') }).sfx('tick', 0.35);
 
-// ------------------------------------------------------------------
-// 연속 플립 – 접기/펼치기를 빠르게 두 번 (손목 좌우 튕기기)
-// ------------------------------------------------------------------
-KNIFE.rapid = clipFromPoses({
-  name: 'rapid', duration: 1.32, meta: { from: 'open', to: 'open', label: '연속 플립' },
-  poses: [
-    [0.0, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip'), ...KG, ...OPEN }],
-    [0.05, { fl: -0.2, ...H('catch'), a: 0 }],
-    [0.15, { a: [PI, 'i'], fl: [0.32, 'o'], b: 0 }],
-    [0.17, { a: PI - 0.07, ...H('pinch') }],
-    [0.19, { a: PI }],
-    [0.27, { b: [-PI, 'i'], fl: [-0.3, 'o'] }],
-    [0.29, { b: -PI + 0.07 }],
-    [0.31, { b: -PI }],
-    [0.4, { b: [0, 'i'], fl: [0.3, 'o'] }],
-    [0.42, { b: -0.08, a: PI }],
-    [0.44, { b: 0 }],
-    [0.53, { a: [0, 'i'], fl: [-0.32, 'o'], ...H('catch') }],
-    [0.55, { a: 0.07 }],
-    [0.57, { a: 0 }],
-    // 두 번째(손 높이를 바꿔서)
-    [0.66, { a: [PI, 'i'], fl: [0.34, 'o'], y: B.y + 0.012, b: 0, ...H('pinch') }],
-    [0.68, { a: PI - 0.06 }],
-    [0.7, { a: PI }],
-    [0.77, { b: [-PI, 'i'], fl: [-0.32, 'o'] }],
-    [0.79, { b: -PI + 0.06 }],
-    [0.81, { b: -PI }],
-    [0.89, { b: [0, 'i'], fl: [0.32, 'o'], y: B.y }],
-    [0.91, { b: -0.07, a: PI }],
-    [0.93, { b: 0 }],
-    [1.02, { a: [0, 'i'], fl: [-0.3, 'o'], ...H('catch') }],
-    [1.045, { a: 0.07 }],
-    [1.07, { a: 0, ...H('grip', { iB: 0.94 }), fl: 0.06 }],
-    [1.32, { ...W(), fl: 0, ...H('grip') }],
-  ],
-  events: [
-    sfx(0.15, 'clack', 0.8), sfx(0.27, 'clack', 0.7), sfx(0.4, 'clack', 0.7), sfx(0.53, 'clack', 0.9),
-    sfx(0.66, 'clack', 0.8), sfx(0.77, 'clack', 0.7), sfx(0.89, 'clack', 0.7), sfx(1.02, 'clack', 1),
-    sfx(0.1, 'swish', 0.4), sfx(0.47, 'swish', 0.5), sfx(0.61, 'swish', 0.4), sfx(0.97, 'swish', 0.5), sfx(1.07, 'catch', 0.4),
-  ],
-});
-
-// ------------------------------------------------------------------
-// 롤오버 – 펼친 칼이 손등 위를 굴러 넘어가 반대편에서 다시 잡힘
-// ------------------------------------------------------------------
-{
-  const P0 = [0.045, 0.09, 0.01], P1 = [0.0, 0.1, -0.03], P2 = [-0.045, 0.085, 0.0];
+// 검지 축 팬 회전 n 바퀴
+const IDX = [0.03, 0.118, 0.012];
+function twirl(s, n = 2, dur = 1.0) {
+  const r0 = KR_AXLE[2] + s.turn;
+  const sp = (rz) => ({ ...K([KR_AXLE[0], KR_AXLE[1], rz], COM_OPEN, null), kpx: IDX[0], kpy: IDX[1], kpz: IDX[2] });
+  s.at(0.1, { ...W(-0.01, 0.01, 0), tw: -0.25, fx: -0.15, ...H('catch') });
+  s.at(0.09, { ...sp(r0 + 0.25), ...H('axle'), tw: -0.4, fx: -0.25, fl: 0 });
+  const halves = n * 2;
+  for (let i = 1; i <= halves; i++) {
+    const e = i === 1 ? 'i' : 'l';
+    const bob = i % 2 ? 0.006 : -0.004;
+    s.at(dur / halves, { krz: [r0 + 0.25 - PI * i, e], y: B.y + 0.01 + bob, tw: -0.4 + (i % 2 ? 0.05 : -0.05) });
+    s.sfx('swish', 0.45 + 0.3 * Math.sin((i / halves) * PI), -dur / halves / 2);
+  }
+  s.turn -= TAU * n;
+  s.at(0.09, { ...s.grip(), ...H('catch'), tw: -0.1, fx: -0.05, y: B.y }).sfx('catch', 0.7);
+  s.at(0.05, { ...H('grip', { iB: 0.94 }), fl: 0.08 }).sfx('tick', 0.45);
+  s.at(0.1, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip') });
+}
+// 손등 위로 굴려 넘기기 (dir = 1 앞으로, -1 되돌아오기)
+function rollover(s, dir = 1, dur = 0.7) {
+  const r0 = KR_AXLE[2] + s.turn;
   const at = (p, rz) => ({ ...K([KR_AXLE[0], KR_AXLE[1], rz], COM_OPEN, null), kpx: p[0], kpy: p[1], kpz: p[2] });
-  const r0 = KR_AXLE[2];
-  KNIFE.rollover = clipFromPoses({
-    name: 'rollover', duration: 1.15, meta: { from: 'open', to: 'open', label: '롤오버' },
-    poses: [
-      [0.0, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip'), ...KG, ...OPEN }],
-      [0.1, { ...W(0, 0.01, 0, { tw: -0.4, fx: -0.1 }), ...H('catch') }],
-      [0.2, { ...at(P0, r0 + 0.2), ...H('flat', { tF: 0.3 }), tw: -0.75 }],
-      [0.45, { ...at(P1, r0 - PI * 0.9), tw: -0.95, fx: -0.15 }],
-      [0.7, { ...at(P2, r0 - PI * 1.9), tw: -0.8 }],
-      [0.84, { ...at([0.0, 0.088, 0.02], r0 - TAU - 0.2), ...H('catch'), tw: -0.4 }],
-      [0.93, { ...KG, krz: KG.krz - TAU, ...H('grip', { iB: 0.94 }), tw: -0.05, fl: 0.06 }],
-      [1.15, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip') }],
-    ],
-    events: [sfx(0.32, 'swish', 0.5), sfx(0.55, 'swish', 0.6), sfx(0.72, 'swish', 0.4), sfx(0.92, 'catch', 0.7), sfx(0.93, 'tick', 0.5)],
-  });
+  const P0 = [0.045 * dir, 0.09, 0.01], P1 = [0.0, 0.1, -0.03], P2 = [-0.045 * dir, 0.085, 0.0];
+  s.at(0.09, { ...W(0, 0.01, 0), tw: -0.4, fx: -0.1, ...H('catch') });
+  s.at(0.09, { ...at(P0, r0 + 0.2 * dir), ...H('flat', { tF: 0.3 }), tw: -0.75 });
+  s.at(dur * 0.36, { ...at(P1, r0 - PI * 0.9 * dir), tw: -0.95, fx: -0.15 }).sfx('swish', 0.55, -0.1);
+  s.at(dur * 0.36, { ...at(P2, r0 - PI * 1.9 * dir), tw: -0.8, fx: -0.1 }).sfx('swish', 0.45, -0.1);
+  s.at(dur * 0.28, { ...at([0.0, 0.088, 0.02], r0 - (TAU + 0.2) * dir), ...H('catch'), tw: -0.4 });
+  s.turn -= TAU * dir;
+  s.at(0.08, { ...s.grip(), ...H('grip', { iB: 0.94 }), tw: -0.05, fl: 0.06 }).sfx('catch', 0.7).sfx('tick', 0.45, 0.01);
+  s.at(0.1, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip') });
+}
+// 공중으로 던지기 – mode 'flip'(앞뒤로 도는) | 'heli'(길이축으로 도는 헬리콥터)
+function toss(s, mode = 'flip', turns = 2, height = 0.26, air = 0.62) {
+  const C = { ...K(KR_GRIP, COM_OPEN), krz: KR_GRIP[2] + s.turn };
+  s.at(0.12, { ...W(0.005, -0.035, 0.012), fx: 0.2, fl: 0.12, ...C });
+  s.at(0.11, { ...W(-0.005, 0.03, -0.01), fx: -0.22, fl: -0.15, ...H('grip') }).sfx('swish', 0.8);
+  s.at(0.05, { ...H('open'), cy: 0.045, cx: -0.005 });
+  const r0 = C.krz;
+  const n = 6;
+  for (let i = 1; i <= n; i++) {
+    const f = i / n;
+    const up = f <= 0.5;
+    const y = height * Math.sin(f * PI) + 0.03 * (1 - f);
+    const ch = { cy: [y, up ? 'o' : 'i'], cx: -0.02 * Math.sin(f * PI), cz: -0.02 * Math.sin(f * PI) };
+    if (mode === 'flip') ch.krz = [r0 - TAU * turns * f, 'l'];
+    else { ch.sy = [s.spin + TAU * turns * f, 'l']; ch.krz = r0 - 0.25 * Math.sin(f * PI); }
+    // 공중에서 손잡이가 벌어졌다 다시 닫힘(딸깍)
+    if (f > 0.15 && f < 0.85) {
+      const g = Math.sin(((f - 0.15) / 0.7) * PI);
+      ch.a = mode === 'flip' ? PI * 0.92 * g : 0.7 * g;
+      ch.b = mode === 'flip' ? -PI * 0.92 * g : -1.3 * g;
+    } else { ch.a = 0; ch.b = 0; }
+    if (i === n - 1) Object.assign(ch, H('catch'), W(0, 0.012, 0), { fx: -0.1 });
+    s.at(air / n, ch);
+    if (i === Math.ceil(n * 0.85)) s.sfx('clack', 0.7, -air / n * 0.4);
+    if (mode === 'heli' || i % 2) s.sfx('swish', 0.5, -air / n / 2);
+  }
+  if (mode === 'flip') s.turn -= TAU * turns; else s.spin += TAU * turns;
+  s.at(0.06, { cy: 0, cx: 0, cz: 0, ...s.grip(), a: 0, b: 0, ...W(0, -0.024, 0.006), fx: 0.14, ...H('grip', { iB: 0.95 }) }).sfx('catch', 1).sfx('clack', 0.45);
+  s.at(0.1, { ...W(0, 0.005, 0), fx: -0.03 });
+  s.at(0.16, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip') });
+}
+// 칼날을 얼굴 앞으로 세워 보여 주는 마무리
+function present(s, hold = 0.7) {
+  s.at(0.35, { ...W(-0.05, 0.035, 0.02), tw: -0.8, fx: 0.0, fl: 0.6 });
+  s.at(hold, { ...W(-0.053, 0.04, 0.02), tw: -0.9, fx: -0.04, fl: 0.66, ...H('grip', { iB: 0.8, tC: 0.3 }) });
+  s.at(0.16, { ...W(0.01, -0.01, 0), tw: 0.1, fx: 0.06, fl: -0.08, ...H('grip') }).sfx('swish', 0.35, -0.08);
+  s.at(0.25, { ...W(), tw: 0, fx: 0, fl: 0 });
+}
+
+const meta = (label) => ({ from: 'open', to: 'open', label });
+
+// ---------- 개별 트릭 ----------
+// 1 팬 회전: 검지로 세 바퀴 → 손등 롤오버로 이어서 마무리
+{
+  const s = new Seq('twirl', meta('팬 회전'));
+  twirl(s, 3, 1.15);
+  rollover(s, 1, 0.65);
+  KNIFE.twirl = s.build();
+}
+// 2 에어리얼: 앞뒤로 두 바퀴 돌며 공중에서 칼이 접혔다 펴짐 → 받자마자 접고 다시 펼치기
+{
+  const s = new Seq('aerial', meta('에어리얼'));
+  toss(s, 'flip', 2, 0.27, 0.66);
+  closeA(s, 0.85); openA(s, 0.85, 0.008);
+  KNIFE.aerial = s.build();
+}
+// 3 연속 플립(젠): 세이프/바이트 핸들을 번갈아 잡으며 여덟 번 넘기기
+{
+  const s = new Seq('rapid', meta('연속 플립'));
+  const hs = [0, 0.012, 0.004, 0.016];
+  for (let r = 0; r < 2; r++) {
+    closeA(s, 0.9, hs[r * 2]); toB(s);
+    openB(s, 0.9, hs[r * 2 + 1]); closeB(s, 0.85); toA(s);
+    openA(s, 0.85, 0.006);
+  }
+  s.at(0.15, { ...W(), fl: 0, ...H('grip') });
+  KNIFE.rapid = s.build();
+}
+// 4 헬리콥터: 길이축으로 세 바퀴 돌며 손잡이가 벌어지는 토스 → 롤오버 왕복
+{
+  const s = new Seq('helicopter', meta('헬리콥터'));
+  toss(s, 'heli', 3, 0.24, 0.7);
+  rollover(s, 1, 0.6);
+  rollover(s, -1, 0.6);
+  KNIFE.helicopter = s.build();
+}
+// 6 프리스타일 콤보
+{
+  const s = new Seq('combo', meta('프리스타일 콤보'));
+  closeA(s, 0.85); toB(s); openB(s, 0.85, 0.012); closeB(s, 0.8); toA(s); openA(s, 0.8);
+  twirl(s, 2, 0.75);
+  rollover(s, 1, 0.6);
+  toss(s, 'heli', 3, 0.25, 0.7);
+  closeA(s, 0.75, 0.01); openA(s, 0.75);
+  toss(s, 'flip', 2, 0.23, 0.66);
+  rollover(s, -1, 0.55);
+  closeA(s, 0.8); toB(s); openB(s, 0.8, 0.01);
+  s.at(0.04, { hb: 0 });
+  present(s, 0.8);
+  KNIFE.combo = s.build();
 }
 
 // ------------------------------------------------------------------
@@ -267,5 +349,5 @@ KNIFE.leftIdle = clipFromPoses({
   poses: [[0, { ...L_BASE }], [1, { ...L_BASE }]],
 });
 
-export const TRICK_ORDER = ['twirl', 'aerial', 'rapid', 'rollover'];
-export const TRICK_KEYS = ['twirl', 'aerial', 'rapid', 'rollover', 'inspect'];
+export const TRICK_ORDER = ['twirl', 'aerial', 'rapid', 'helicopter', 'combo'];
+export const TRICK_KEYS = ['twirl', 'aerial', 'rapid', 'helicopter', 'inspect', 'combo'];

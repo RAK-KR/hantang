@@ -12,11 +12,12 @@ GitHub Pages에 이 폴더 그대로 올리면 됩니다(빌드 없음, three.js
 |---|---|
 | WASD / Shift / Ctrl / Space | 이동 / 달리기 / 앉기 / 점프 |
 | F | 칼 펼치기·접기 |
-| R | 다음 트릭(팬 회전 → 에어리얼 → 연속 플립 → 롤오버) |
-| 1~5 | 트릭 고르기(1 팬 회전, 2 에어리얼, 3 연속 플립, 4 롤오버, 5 살펴보기) |
+| R | 다음 트릭(팬 회전 → 에어리얼 → 연속 플립 → 헬리콥터 → 프리스타일 콤보) |
+| 1~6 | 트릭 고르기(1 팬 회전+롤오버, 2 에어리얼, 3 연속 플립(젠), 4 헬리콥터, 5 살펴보기, 6 프리스타일 콤보) |
 | E | 칼 살펴보기 |
 | 좌클릭 | 휘두르기(접혀 있으면 펼치기) |
 | G (꾹) | 감정표현 휠 – 마우스로 고르고 G를 떼면 실행(클릭도 가능, 우클릭 취소) |
+| G 누른 채 1 / 2 | 휠 탭 전환(1 제스처, 2 춤) – 마우스 휠로도 가능 |
 | V | 3인칭 보기 |
 | Esc | 설정(마우스 감도, 해상도, 디더, 폴리곤 흔들림, 볼륨) |
 
@@ -33,10 +34,11 @@ js/input.js         키보드/마우스(키 반복 무시)
 js/anim.js          키프레임 애니메이션(단조 3차 보간, 블렌딩, 이벤트)
 js/hand.js          손가락 관절 손 리그 + 손 모양 프리셋
 js/balisong.js      발리송 모델(손잡이 두 개가 각각 다른 핀에 도는 실제 구조)
-js/knifeClips.js    칼 트릭 키프레임 ← 트릭 추가/수정은 여기
+js/knifeClips.js    칼 트릭 – 트릭 빌더(Seq)와 기술 조각(closeA/openA/closeB/openB/twirl/rollover/toss/present)을 이어 붙여 만듦 ← 트릭 추가/수정은 여기
 js/viewmodel.js     1인칭 손/칼 뷰모델
 js/character.js     3인칭 캐릭터 리그
-js/emotes.js        감정표현(1인칭 왼손 + 3인칭 전신) ← 감정표현 추가/수정은 여기
+js/emotes.js        감정표현(1인칭 왼손 + 3인칭 전신)과 휠 탭 구성 ← 감정표현 추가/수정은 여기
+js/dances.js        춤 7종(오리지널 안무) – 팔 자세 라이브러리 + 박자 목록으로 만드는 빌더
 js/emoteWheel.js    원형 휠 UI
 js/npc.js           공범 덕배
 js/hud.js / settings.js / audio.js
@@ -46,3 +48,5 @@ js/hud.js / settings.js / audio.js
 `js/emotes.js` 맨 아래 `EMOTES` 배열에 항목을 추가합니다.
 - 손 제스처: `fp`(1인칭 왼손 클립) + `body`(전신 클립)
 - 전신 동작: `tp: true` + `body` (카메라가 앞으로 빠져서 보여 줌)
+- 춤 추가: `js/dances.js`에 `buildDance`로 박자 목록을 만들고, `emotes.js`의 춤 탭에 `D(...)`로 등록
+- 춤 음악: audio.js `STYLES`(parapara, jersey, trap, house, disco, electro, trot) – 전부 직접 합성한 오리지널 비트

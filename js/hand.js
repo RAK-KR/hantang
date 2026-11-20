@@ -128,7 +128,7 @@ export const HANDS = {
   fist: { iB: 1, iD: 1, mB: 1, mD: 1, rB: 1, rD: 1, pB: 1, pD: 1, sp: 0, tF: 0.9, tA: 0.4, tC: 0.6 },
   grip: { iB: 0.86, iD: 0.82, mB: 0.9, mD: 0.85, rB: 0.92, rD: 0.86, pB: 0.95, pD: 0.88, sp: 0.02, tF: 0.75, tA: 0.2, tC: 0.45 },
   loose: { iB: 0.55, iD: 0.45, mB: 0.6, mD: 0.5, rB: 0.65, rD: 0.55, pB: 0.7, pD: 0.6, sp: 0.15, tF: 0.4, tA: 0.0, tC: 0.25 },
-  open: { iB: 0.02, iD: 0.04, mB: 0.02, mD: 0.04, rB: 0.03, rD: 0.05, pB: 0.04, pD: 0.06, sp: 0.6, tF: -0.1, tA: -0.3, tC: 0.0 },
+  open: { iB: 0.02, iD: 0.04, mB: 0.02, mD: 0.04, rB: 0.03, rD: 0.05, pB: 0.04, pD: 0.06, sp: 0.6, tF: 0.25, tA: 0.1, tC: 0.12 },
   flat: { iB: 0.0, iD: 0.02, mB: 0.0, mD: 0.02, rB: 0.0, rD: 0.02, pB: 0.0, pD: 0.02, sp: 0.05, tF: 0.1, tA: 0.45, tC: 0.05 },
   point: { iB: 0.0, iD: 0.02, mB: 1, mD: 1, rB: 1, rD: 1, pB: 1, pD: 1, sp: 0, tF: 0.8, tA: 0.5, tC: 0.6 },
   thumbUp: { iB: 1, iD: 1, mB: 1, mD: 1, rB: 1, rD: 1, pB: 1, pD: 1, sp: 0, tF: -0.35, tA: -0.2, tC: -0.1 },
