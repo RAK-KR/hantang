@@ -66,8 +66,25 @@ export class Viewmodel {
     this.sway.add(this.forearmL);
     this.elbowL = new THREE.Vector3(-0.44, -0.42, -0.2);
 
+    // 칼날 잔상(휘두를 때)
+    const TN = 12;
+    const tg = new THREE.BufferGeometry();
+    tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TN * 2 * 3), 3));
+    tg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(TN * 2 * 3), 3));
+    const idx = [];
+    for (let i = 0; i < TN - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    tg.setIndex(idx);
+    this.trailMesh = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    this.trailMesh.frustumCulled = false;
+    this.trailMesh.matrixAutoUpdate = false;
+    this.scene.add(this.trailMesh);
+    this.trailPts = [];
+    this.TN = TN;
+
     this.animR = new Animator(R_BASE);
-    this.animR.wrap = ['krx', 'kry', 'krz', 'sy'];
+    this.animR.wrap = ['krx', 'kry', 'krz', 'sy', 'rx', 'ry', 'rz'];
     this.animL = new Animator(L_BASE);
     this.animR.onEvent = (type, arg) => this._event(type, arg, 0.35);
     this.animL.onEvent = (type, arg) => this._event(type, arg, -0.35);
@@ -91,7 +108,7 @@ export class Viewmodel {
   }
 
   _event(type, arg, pan) {
-    if (type === 'sfx') sfx(arg.name || arg, arg.v ?? 1, pan);
+    if (type === 'sfx') { sfx(arg.name || arg, arg.v ?? 1, pan); if (this.onNoise) this.onNoise(arg.name || arg, arg.v ?? 1); }
     else if (type === 'open') this.open = !!arg;
     else if (this.onEmoteEvent) this.onEmoteEvent(type, arg);
   }
@@ -100,7 +117,14 @@ export class Viewmodel {
 
   // ---------------- 칼 ----------------
   knifeAction(name) {
+    // 휘두르기는 정방향/역방향 번갈아, 앞 휘두르기가 끝나 가면 바로 이어서
+    if (name === 'slash') { name = this._alt ? 'slash2' : 'slash'; }
+    const curClip = this.animR.clip;
+    if (this.busyR && name.startsWith('slash') && curClip?.meta?.cancelAt && this.animR.time >= curClip.meta.cancelAt) {
+      this.busyR = false; this.queue = null;
+    }
     if (this.busyR) { this.queue = name; return; }
+    if (name.startsWith('slash')) this._alt = !this._alt;
     const t = KNIFE[name];
     if (!t) return;
     // 접혀 있는데 펼친 상태가 필요한 트릭이면 먼저 펼치고 이어서
@@ -172,6 +196,7 @@ export class Viewmodel {
     this.sway.rotation.set(this.lag.y * 0.8, this.lag.x * 1.2, -this.lag.x * 0.6 + bx * 0.5);
 
     this._forearm(this.wristR, this.handR, this.forearmR, this.elbowR);
+    this._trail(pr.trail > 0.5);
     this._forearm(this.wristL, this.handL, this.forearmL, this.elbowL);
   }
 
@@ -240,6 +265,31 @@ export class Viewmodel {
     fa.quaternion.setFromRotationMatrix(m);
     fa.position.copy(w).addScaledVector(Y, -0.012);
     fa.children[0].scale.y = Math.max(0.3, len + 0.25);
+  }
+
+  _trail(on) {
+    const pts = this.trailPts;
+    if (on) {
+      this.camera.updateMatrixWorld(true);
+      const b = this.knife.blade;
+      pts.unshift([b.localToWorld(new THREE.Vector3(0, 0.025, 0)), b.localToWorld(new THREE.Vector3(0.001, 0.106, 0))]);
+      if (pts.length > this.TN) pts.pop();
+    } else if (pts.length) pts.pop();
+    const g = this.trailMesh.geometry;
+    const P = g.attributes.position.array, C = g.attributes.color.array;
+    for (let i = 0; i < this.TN; i++) {
+      const q = pts[Math.min(i, pts.length - 1)];
+      const f = pts.length > 1 ? Math.max(0, 1 - i / (pts.length - 1)) : 0;
+      for (let k = 0; k < 2; k++) {
+        const v = q ? q[k] : this.camera.position;
+        P.set([v.x, v.y, v.z], (i * 2 + k) * 3);
+        const c = (k ? 0.75 : 0.25) * f * f;
+        C.set([c * 0.85, c * 0.9, c], (i * 2 + k) * 3);
+      }
+    }
+    g.attributes.position.needsUpdate = true;
+    g.attributes.color.needsUpdate = true;
+    this.trailMesh.visible = pts.length > 1;
   }
 
   setAspect(a) { this.camera.aspect = a; this.camera.updateProjectionMatrix(); }

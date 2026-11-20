@@ -132,6 +132,69 @@ const GEN = {
     g.fillStyle = '#555'; g.fillRect(0, 13, w, 3);
     noise(g, w, h, 0, 12);
   }),
+  // 경비 제복 / 얼굴 / 모자 / 바지
+  uniform: () => make(16, 16, (g, w, h) => {
+    g.fillStyle = '#2c3e66'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#25355a'; for (let i = 0; i < 16; i += 4) g.fillRect(0, i, w, 1);
+    g.fillStyle = '#c9a43b'; g.fillRect(10, 3, 3, 3);
+    noise(g, w, h, 0, 14);
+  }),
+  slacks: () => make(16, 16, (g, w, h) => {
+    g.fillStyle = '#23262e'; g.fillRect(0, 0, w, h);
+    noise(g, w, h, 0, 12);
+  }),
+  face: () => make(32, 32, (g, w, h) => {
+    g.fillStyle = '#c99a78'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2b2b33'; g.fillRect(0, 0, w, 6);
+    g.fillStyle = '#f2efe8'; g.fillRect(8, 12, 5, 3); g.fillRect(19, 12, 5, 3);
+    g.fillStyle = '#2a1d16'; g.fillRect(10, 12, 2, 3); g.fillRect(21, 12, 2, 3);
+    g.fillStyle = '#3a2a20'; g.fillRect(7, 10, 6, 1); g.fillRect(19, 10, 6, 1);
+    g.fillStyle = '#a77a5c'; g.fillRect(15, 15, 2, 5);
+    g.fillStyle = '#3a2a20'; g.fillRect(10, 21, 12, 2);
+    g.fillStyle = '#8a4a40'; g.fillRect(12, 24, 8, 2);
+    noise(g, w, h, 0, 10);
+  }, false),
+  skin: () => make(8, 8, (g, w, h) => { g.fillStyle = '#c99a78'; g.fillRect(0, 0, w, h); noise(g, w, h, 0, 8); }),
+  cap: () => make(16, 16, (g, w, h) => {
+    g.fillStyle = '#1c2744'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c9a43b'; g.fillRect(6, 4, 4, 4);
+    noise(g, w, h, 0, 10);
+  }),
+  exit: () => make(64, 24, (g, w, h) => {
+    g.fillStyle = '#1f8a3a'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#e8ffe8'; g.font = 'bold 14px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('비상구', 32, 13);
+  }, false),
+  plate: () => make(64, 16, (g, w, h) => {
+    g.fillStyle = '#c8c2b0'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2a2a2a'; g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('지점장실', 32, 9);
+  }, false),
+  plate2: () => make(64, 16, (g, w, h) => {
+    g.fillStyle = '#c8c2b0'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2a2a2a'; g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('경비실', 32, 9);
+  }, false),
+  lockers: () => make(64, 64, (g, w, h) => {
+    g.fillStyle = '#8a8f96'; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 8) for (let x = 0; x < w; x += 8) {
+      g.fillStyle = '#6d7279'; g.fillRect(x, y, 8, 1); g.fillRect(x, y, 1, 8);
+      g.fillStyle = '#c9a85a'; g.fillRect(x + 5, y + 3, 1, 2);
+    }
+    noise(g, w, h, 0, 10);
+  }),
+  cash: () => make(16, 16, (g, w, h) => {
+    g.fillStyle = '#4f5d3b'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#e8e2c8'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('₩', 8, 9);
+    noise(g, w, h, 0, 14);
+  }, false),
+  monitorScr: () => make(32, 24, (g, w, h) => {
+    g.fillStyle = '#0d1f2a'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#3d8fb0';
+    for (let i = 0; i < 4; i++) { const x = (i % 2) * 16 + 1, y = Math.floor(i / 2) * 12 + 1; g.strokeStyle = '#3d8fb0'; g.strokeRect(x, y, 14, 10); g.fillRect(x + 2, y + 6, 6, 2); }
+    g.fillStyle = '#d33'; g.fillRect(28, 1, 2, 2);
+  }, false),
   // 발리송 칼날 – 길이 방향으로 그라데이션, 날 쪽 밝게
   blade: () => make(16, 64, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, w, 0);

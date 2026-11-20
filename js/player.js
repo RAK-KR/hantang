@@ -4,7 +4,7 @@ import * as THREE from 'three';
 export class Player {
   constructor(world) {
     this.world = world;
-    this.pos = new THREE.Vector3(0, 0, 6);
+    this.pos = new THREE.Vector3(0, 0, 7.0);
     this.vel = new THREE.Vector3();
     this.yaw = 0;         // -Z 방향(카운터 쪽)을 보게
     this.pitch = 0;

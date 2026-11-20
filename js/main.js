@@ -9,7 +9,7 @@ import { Character, BODY_IDLE, BODY_WALK } from './character.js';
 import { Hud } from './hud.js';
 import { EmoteWheel } from './emoteWheel.js';
 import { EMOTES, EMOTE_TABS } from './emotes.js';
-import { Npc } from './npc.js';
+import { Heist } from './heist.js';
 import { TRICK_ORDER, TRICK_KEYS, KNIFE } from './knifeClips.js';
 import { initAudio, sfx, setVolume, startMusic, stopMusic } from './audio.js';
 import { clipFromPoses } from './anim.js';
@@ -35,13 +35,19 @@ const hud = new Hud();
 const body = new Character();
 body.root.visible = false;
 scene.add(body.root);
-const npc = new Npc(scene, hud, camera);
+const heist = new Heist({ scene, world, player, camera, hud, vm });
+// 덕배는 밖에서 차 대기 중 – 감정표현 반응은 무전으로
+const npc = {
+  react(e) { if (e.npc?.length && Math.random() < 0.6) heist.say(e.npc[Math.floor(Math.random() * e.npc.length)]); },
+  stopMusicEmote() {},
+};
 
 const settings = new Settings({
   apply: (s) => {
     input.sens = s.sens;
     post.height = s.res === 0 ? Math.max(240, innerHeight) : s.res;
     post.mat.uniforms.uDither.value = s.dither ? 1 : 0;
+    post.mat.uniforms.uBright.value = s.bright;
     shared.uSnapScale.value = s.jitter ? 1 : 8;
     sharedVM.uSnapScale.value = s.jitter ? 2 : 8;
     shared.uAffine.value = s.jitter ? 0.65 : 0.0;
@@ -97,17 +103,34 @@ body.anim.onEvent = (type, arg) => {
 const wheel = new EmoteWheel(EMOTE_TABS, playEmote);
 
 vm.onTrick = (name) => hud.showToast(name);
-player.onStep = (v) => sfx('step', v * 0.6);
+// 휘두를 때 카메라 흔들림
+let shake = 0, shakeDir = 1;
+vm.onEmoteEvent = (type, arg) => {
+  if (type === 'shake') { shake = Math.abs(arg); shakeDir = Math.sign(arg) || 1; heist.playerAttack(); }
+};
+// 소리 → 경비가 들음
+vm.onNoise = (name, v = 1) => {
+  const r = name === 'clack' ? 2.5 + 3 * v : name === 'catch' ? 1.6 : name === 'slash' ? 0 : name === 'swish' ? 1.2 * v : 0;
+  if (r > 0) heist.noise(player.pos, r, 0.7);
+};
+player.onStep = (v) => {
+  sfx('step', v * 0.6);
+  heist.noise(player.pos, v >= 1.3 ? 5 : v >= 1 ? 7 : v >= 0.7 ? 2.2 : 0.5, v >= 1 ? 0.9 : 0.5);
+};
 
 // ---------- 시작/일시정지 ----------
 const startEl = document.getElementById('start');
 let started = DEBUG;
+let keysTimer = 0;
 if (DEBUG) startEl.style.display = 'none';
 startEl.addEventListener('click', () => { initAudio(); input.lock(); });
 canvas.addEventListener('click', () => { if (started && !settings.open) input.lock(); });
 input.onLockChange = (locked) => {
-  if (locked) { started = true; startEl.style.display = 'none'; settings.hide(); }
-  else if (started && !DEBUG) { wheel.cancel(); settings.show(); }
+  if (locked) {
+    if (!started || !keysTimer) keysTimer = setTimeout(() => hud.keys.classList.add('hide'), 15000);
+    started = true; startEl.style.display = 'none'; settings.hide();
+  }
+  else if (started && !DEBUG && !heist.ended) { wheel.cancel(); settings.show(); }
 };
 settings.onResume = () => { initAudio(); input.lock(); };
 
@@ -138,7 +161,7 @@ function frame(now) {
 }
 
 function step(dt) {
-  const active = (input.locked || DEBUG) && !settings.open;
+  const active = (input.locked || DEBUG) && !settings.open && !heist.ended;
   const [mdx, mdy] = input.consumeMouse();
 
   // 감정표현 휠
@@ -167,12 +190,18 @@ function step(dt) {
   const moving = active && ['forward', 'back', 'left', 'right', 'jump'].some((k) => input.isDown(k));
   if (cam.emote && moving && cam.emote.cancelOnMove !== false) stopBodyEmote();
   player.update(dt, input, active && !cam.emote && !wheel.open);
+  // 경비와 겹치지 않게
+  for (const g of heist.guards) {
+    if (g.state === 'down') continue;
+    const dx = player.pos.x - g.pos.x, dz = player.pos.z - g.pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.6 && d > 1e-4) { player.pos.x += dx / d * (0.6 - d); player.pos.z += dz / d * (0.6 - d); }
+  }
 
   // 칼 조작 (휠/전신 감정표현 중에는 막음)
   if (active && !wheel.open && !cam.emote) {
     if (input.wasPressed('flip')) vm.toggleKnife();
     if (input.wasPressed('trick')) { vm.knifeAction(TRICK_ORDER[trickIdx % TRICK_ORDER.length]); trickIdx++; }
-    if (input.wasPressed('inspect')) vm.knifeAction('inspect');
+    if (input.wasPressed('KeyH')) hud.toggleKeys();
     for (let i = 0; i < TRICK_KEYS.length; i++) if (input.wasPressed('Digit' + (i + 1))) vm.knifeAction(TRICK_KEYS[i]);
     if (input.mousePressed[0] && !clickUsed) vm.knifeAction(vm.open ? 'slash' : 'open');
     if (input.wasPressed('view')) { cam.toggle = !cam.toggle; cam.orbitYaw = 0; cam.orbitPitch = -0.12; }
@@ -199,7 +228,7 @@ function step(dt) {
   vm.crouch = player.crouch;
   vm.update(dt, { speed: player.speed, running: player.running, grounded: player.grounded, lookDX: looking && !cam.emote ? mdx : 0, lookDY: looking && !cam.emote ? mdy : 0 });
 
-  npc.update(dt, player);
+  heist.update(dt, input, active && !wheel.open && !cam.emote, { dancing: !!(bodyEmote && bodyEmote.dance) });
 
   // 카메라 위치
   player.applyCamera(camera);
@@ -224,8 +253,17 @@ function step(dt) {
     camera.position.lerpVectors(_eye, _tp, w);
     camera.quaternion.slerpQuaternions(_q1, _q2, w);
   }
+  if (shake > 0.001 && cam.tp < 0.5) {
+    const k = shake * shake;
+    camera.rotateZ(-0.035 * k * shakeDir);
+    camera.rotateY(0.018 * k * shakeDir);
+    camera.rotateX(-0.012 * k);
+    shake *= Math.pow(0.0004, dt);
+  }
   body.root.visible = cam.tp > 0.35;
   hud.setCrosshair(cam.tp < 0.5 && !wheel.open);
+  camera.updateMatrixWorld();
+  hud.update(dt, heist, camera);
   input.endFrame();
 }
 
@@ -245,5 +283,5 @@ function render() {
 requestAnimationFrame(frame);
 
 // 검수/디버그용
-window.HT = { wheel, input, clipFromPoses, vmClips: KNIFE, emoteFP: Object.fromEntries(EMOTES.filter(e => e.fp).map(e => [e.id, e.fp])), emoteBD: Object.fromEntries(EMOTES.map(e => [e.id, e.body])), vm, body, npc, player, camera, cam, scene, post, playEmote, EMOTES, step, render, renderer };
+window.HT = { hud, heist, world, wheel, input, clipFromPoses, vmClips: KNIFE, emoteFP: Object.fromEntries(EMOTES.filter(e => e.fp).map(e => [e.id, e.fp])), emoteBD: Object.fromEntries(EMOTES.map(e => [e.id, e.body])), vm, body, npc, player, camera, cam, scene, post, playEmote, EMOTES, step, render, renderer };
 window.ready = true;

@@ -2,7 +2,7 @@
 export const KEYS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   run: 'ShiftLeft', jump: 'Space', crouch: 'ControlLeft', crouch2: 'KeyC',
-  flip: 'KeyF', trick: 'KeyR', emote: 'KeyG', view: 'KeyV', inspect: 'KeyE',
+  flip: 'KeyF', trick: 'KeyR', emote: 'KeyG', view: 'KeyV',
 };
 
 export class Input {

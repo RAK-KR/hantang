@@ -34,10 +34,10 @@ function limb(len, r0, r1, mat, sides = 6) {
 export class Character {
   constructor(o = {}) {
     const jacket = ps1Mat({ map: tex(o.jacketTex || 'sleeve'), color: o.jacket ?? 0xffffff });
-    const jeans = ps1Mat({ map: tex('jeans') });
-    const knit = ps1Mat({ map: tex('knit') });
-    const shoe = ps1Mat({ map: tex('sneaker') });
-    const maskMat = ps1Mat({ map: tex('mask') });
+    const jeans = ps1Mat({ map: tex(o.pantsTex || 'jeans') });
+    const knit = ps1Mat({ map: tex(o.headTex || 'knit') });
+    const shoe = ps1Mat({ map: tex(o.shoeTex || 'sneaker'), color: o.shoeColor ?? 0xffffff });
+    const maskMat = ps1Mat({ map: tex(o.faceTex || 'mask') });
     this.root = new THREE.Group();
     this.root.name = 'character';
 
@@ -63,8 +63,16 @@ export class Character {
     const hm = new THREE.Mesh(headG, [knit, knit, knit, knit, maskMat, knit]);
     headG.setAttribute('color', new THREE.BufferAttribute(new Float32Array(headG.attributes.position.count * 3).fill(1), 3));
     this.head.add(hm);
-    // 비니 꼭지
-    this.head.add(part(new THREE.CylinderGeometry(0.03, 0.05, 0.05, 6), knit, 0.28));
+    if (o.cap) {
+      // 경비 모자: 챙 + 윗부분
+      const capM = ps1Mat({ map: tex('cap') });
+      this.head.add(part(new THREE.BoxGeometry(0.24, 0.08, 0.26), capM, 0.28));
+      const brim = mesh(new THREE.BoxGeometry(0.22, 0.02, 0.1), capM);
+      brim.position.set(0, 0.25, 0.16); this.head.add(brim);
+    } else {
+      // 비니 꼭지
+      this.head.add(part(new THREE.CylinderGeometry(0.03, 0.05, 0.05, 6), knit, 0.28));
+    }
 
     // 팔
     this.arm = {};
@@ -89,13 +97,31 @@ export class Character {
       mount.add(hand.root);
       this.arm[key] = { sh, el, wr, hand };
     }
-    // 오른손 칼
-    this.knife = new Balisong({ vm: false });
+    // 오른손 무기: 칼(강도) 또는 경찰봉(경비)
     const kp = new THREE.Group();
     kp.position.set(0.052, 0.064, 0.03); kp.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
-    kp.add(this.knife.root);
     this.arm.r.hand.root.add(kp);
-    this.knife.set(0, 0);
+    if (o.weapon === 'baton') {
+      const bm = ps1Mat({ color: 0x1b1b1e, spec: 0.4 });
+      const baton = mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.55, 6).translate(0, 0.17, 0), bm);
+      kp.add(baton);
+      this.knife = { set() {}, root: baton };
+    } else {
+      this.knife = new Balisong({ vm: false });
+      kp.add(this.knife.root);
+      this.knife.set(0, 0);
+    }
+    // 왼손 손전등
+    if (o.flashlight) {
+      const fg = new THREE.Group();
+      fg.position.set(-0.04, 0.065, 0.035);
+      const body = mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.2, 6).rotateX(Math.PI / 2), ps1Mat({ color: 0x2a2a2e, spec: 0.5 }));
+      body.position.z = 0.04; fg.add(body);
+      const lens = mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.02, 8).rotateX(Math.PI / 2), ps1Mat({ color: 0xfff6d0, emissive: 1 }));
+      lens.position.z = 0.145; fg.add(lens);
+      this.arm.l.hand.root.add(fg);
+      this.flash = fg;
+    }
 
     // 다리
     this.leg = {};
@@ -165,4 +191,59 @@ export const BODY_WALK = clipFromPoses({
     [0.75, { ltX: 0.05, lkX: 0.7, rtX: 0.1, rkX: 0.15, hy: 0.0, lfX: 0.0 }],
     [1.0, { ltX: 0.45, lkX: 0.1, rtX: -0.35, rkX: 0.25, luX: -0.3, ruX: 0.35, leX: 0.25, reX: 0.45, hy: -0.02, lfX: 0.1, rfX: -0.2 }],
   ],
+});
+
+// ---------- 경비 동작 ----------
+export const BODY_RUN = clipFromPoses({
+  name: 'bodyRun', duration: 0.66, loop: true,
+  poses: [
+    [0, { ltX: 0.75, lkX: 0.2, rtX: -0.45, rkX: 0.6, luX: -0.5, ruX: 0.7, leX: 1.3, reX: 1.4, hy: -0.04, srx: 0.18, lfX: 0.2, rfX: -0.3 }],
+    [0.165, { ltX: 0.2, lkX: 0.3, rtX: 0.1, rkX: 1.3, hy: 0.01 }],
+    [0.33, { ltX: -0.45, lkX: 0.6, rtX: 0.75, rkX: 0.2, luX: 0.7, ruX: -0.5, leX: 1.4, reX: 1.3, hy: -0.04, lfX: -0.3, rfX: 0.2 }],
+    [0.495, { ltX: 0.1, lkX: 1.3, rtX: 0.2, rkX: 0.3, hy: 0.01 }],
+    [0.66, { ltX: 0.75, lkX: 0.2, rtX: -0.45, rkX: 0.6, luX: -0.5, ruX: 0.7, leX: 1.3, reX: 1.4, hy: -0.04, lfX: 0.2, rfX: -0.3 }],
+  ],
+});
+// 경찰봉 휘두르기 (0.32초에 맞음)
+export const BODY_SWING = clipFromPoses({
+  name: 'bodySwing', duration: 0.75,
+  poses: [
+    [0, { ruX: 0.3, ruZ: 0.2, reX: 0.6, ruY: 0, srx: 0.05, sry: 0 }],
+    [0.22, { ruX: 2.6, ruZ: 0.5, reX: 1.6, ruY: 0.3, sry: 0.35, srx: -0.08, rwX: -0.4 }],
+    [0.34, { ruX: 0.9, ruZ: -0.2, reX: 0.2, ruY: -0.2, sry: -0.3, srx: 0.25, rwX: 0.5 }],
+    [0.45, { ruX: 0.6, ruZ: -0.25, reX: 0.3, sry: -0.35, srx: 0.22 }],
+    [0.75, { ruX: 0.3, ruZ: 0.2, reX: 0.6, ruY: 0, srx: 0.05, sry: 0, rwX: 0 }],
+  ],
+});
+// 두리번거리기
+export const BODY_LOOK = clipFromPoses({
+  name: 'bodyLook', duration: 3.0, loop: true,
+  poses: [
+    [0, { nry: 0, sry: 0 }], [0.7, { nry: 0.8, sry: 0.25 }], [1.4, { nry: 0.8, sry: 0.25 }],
+    [2.1, { nry: -0.8, sry: -0.25 }], [2.7, { nry: -0.8, sry: -0.25 }], [3.0, { nry: 0, sry: 0 }],
+  ],
+});
+// 졸기 (고개 푹, 숨쉬기)
+export const BODY_SLEEP = clipFromPoses({
+  name: 'bodySleep', duration: 3.2, loop: true,
+  poses: [
+    [0, { nrx: 0.75, srx: 0.25, nrz: 0.15, luX: 0.2, ruX: 0.2, leX: 0.5, reX: 0.5, hy: -0.01 }],
+    [1.6, { nrx: 0.85, srx: 0.3, nrz: 0.2, hy: -0.02 }],
+    [3.2, { nrx: 0.75, srx: 0.25, nrz: 0.15, hy: -0.01 }],
+  ],
+});
+// 깜짝 놀람
+export const BODY_ALERT = clipFromPoses({
+  name: 'bodyAlert', duration: 0.6,
+  poses: [
+    [0, { hy: 0, srx: 0.03 }],
+    [0.12, { hy: 0.03, srx: -0.15, luX: 0.6, leX: 1.2, ruX: 0.6, reX: 1.2, nrx: -0.1 }],
+    [0.6, { hy: 0, srx: 0.05, luX: 0.3, leX: 0.8, ruX: 0.4, reX: 0.8, nrx: 0 }],
+  ],
+});
+// 기절해서 누운 자세(몸은 Guard 쪽에서 눕힘)
+export const BODY_DOWN = clipFromPoses({
+  name: 'bodyDown', duration: 1, loop: true,
+  poses: [[0, { luX: 0.4, luZ: 0.9, leX: 0.6, ruX: -0.2, ruZ: 0.6, reX: 0.3, ltX: 0.2, lkX: 0.5, rtX: -0.05, rkX: 0.1, nry: 0.6, nrx: 0.2 }],
+    [1, { luX: 0.4, luZ: 0.9, leX: 0.6, ruX: -0.2, ruZ: 0.6, reX: 0.3, ltX: 0.2, lkX: 0.5, rtX: -0.05, rkX: 0.1, nry: 0.6, nrx: 0.2 }]],
 });

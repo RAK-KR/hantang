@@ -3,7 +3,7 @@
 // - 저해상도 렌더 타깃 -> 15비트 색 + 4x4 디더 -> 화면 확대(최근접)
 import * as THREE from 'three';
 
-export const MAX_POINT = 6;
+export const MAX_POINT = 8;
 
 // 모든 PS1 머티리얼이 공유하는 유니폼 (값을 바꾸면 전체에 반영)
 export const shared = {
@@ -155,10 +155,11 @@ export class PS1Post {
         uDither: { value: 1 },
         uLevels: { value: 32 },
         uVignette: { value: 0.35 },
+        uBright: { value: 1.15 },
       },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
       fragmentShader: /* glsl */`
-        uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uDither; uniform float uLevels; uniform float uVignette;
+        uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uDither; uniform float uLevels; uniform float uVignette; uniform float uBright;
         varying vec2 vUv;
         float bayer(vec2 p){
           int x = int(mod(p.x, 4.0)); int y = int(mod(p.y, 4.0));
@@ -172,6 +173,7 @@ export class PS1Post {
         void main(){
           vec2 px = floor(vUv * uRes);
           vec3 c = texture2D(tDiffuse, (px + 0.5) / uRes).rgb;
+          c = pow(c * uBright, vec3(1.0 / mix(1.0, 1.25, clamp(uBright - 1.0, 0.0, 1.0))));
           c += bayer(px) * uDither / uLevels;
           c = floor(c * uLevels + 0.5) / uLevels;
           vec2 q = vUv - 0.5;

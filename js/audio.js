@@ -276,3 +276,26 @@ export function stopMusic() {
   setTimeout(() => b.disconnect(), 600);
   music = null; musicBus = null;
 }
+
+// ---------------- 경보 사이렌 ----------------
+let siren = null;
+export function startSiren() {
+  if (!ctx || siren) return;
+  const o = ctx.createOscillator(); o.type = 'square';
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 1.6;
+  const lg = ctx.createGain(); lg.gain.value = 220;
+  lfo.connect(lg).connect(o.frequency);
+  o.frequency.value = 760;
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1800;
+  const g = ctx.createGain(); g.gain.value = 0.0001;
+  g.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 0.3);
+  o.connect(f).connect(g).connect(master);
+  o.start(); lfo.start();
+  siren = { o, lfo, g };
+}
+export function stopSiren() {
+  if (!siren) return;
+  const s = siren; siren = null;
+  s.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.1);
+  setTimeout(() => { s.o.stop(); s.lfo.stop(); }, 500);
+}

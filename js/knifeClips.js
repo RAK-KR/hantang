@@ -39,7 +39,7 @@ export const R_BASE = {
   ...HANDS.grip,
   ...KG,
   cx: 0, cy: 0, cz: 0,
-  a: 0, b: 0, kv: 1, hb: 0, sy: 0, cmy: -0.035,
+  a: 0, b: 0, kv: 1, hb: 0, sy: 0, cmy: -0.035, trail: 0,
 };
 export const L_BASE = {
   x: -0.3, y: -0.8, z: -0.3, rx: 0.8, ry: 1.2, rz: 0.6, tw: 0, fx: 0, fl: 0,
@@ -332,17 +332,44 @@ KNIFE.inspect = clipFromPoses({
 // ------------------------------------------------------------------
 // 휘두르기
 // ------------------------------------------------------------------
-KNIFE.slash = clipFromPoses({
-  name: 'slash', duration: 0.48, meta: { from: 'open', to: 'open', label: '', blend: 0.04 },
-  poses: [
-    [0.0, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip'), ...KG, ...OPEN }],
-    [0.08, { ...W(0.04, 0.05, 0.03, { tw: -0.3, fx: -0.4, fl: 0.2 }), ...H('grip', { iB: 1, mB: 1 }) }],
-    [0.17, { ...W(-0.14, -0.06, -0.08, { tw: 0.5, fx: 0.55, fl: -0.4 }) }],
-    [0.24, { ...W(-0.16, -0.08, -0.06, { tw: 0.55, fx: 0.6, fl: -0.45 }) }],
-    [0.48, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip') }],
-  ],
-  events: [sfx(0.1, 'slash', 1)],
-});
+// 각도를 기준값에서 가장 가까운 2π 등가로 맞춤(손목이 엉뚱하게 한 바퀴 도는 것 방지)
+const near = (v, ref) => v + Math.round((ref - v) / TAU) * TAU;
+const R3 = (r, ref) => ({ rx: near(r[0], ref.rx), ry: near(r[1], ref.ry), rz: near(r[2], ref.rz) });
+function slashClip(name, keys, ev) {
+  // keys: [시간, 위치[x,y,z], 회전[rx,ry,rz], 이징, 추가]
+  const poses = [[0, { ...W(), tw: 0, fx: 0, fl: 0, ...H('grip'), ...KG, ...OPEN, trail: 0 }]];
+  let ref = { rx: B.rx, ry: B.ry, rz: B.rz };
+  for (const [t, p, r, e, extra] of keys) {
+    const rr = R3(r, ref); ref = rr;
+    const ch = { x: p[0], y: p[1], z: p[2], ...rr, tw: 0, fx: 0, fl: 0, ...(extra || {}) };
+    const o = {};
+    for (const k in ch) o[k] = e && 'xyzrxryrz'.includes(k) && k.length <= 2 ? [ch[k], e] : ch[k];
+    poses.push([t, o]);
+  }
+  const end = keys[keys.length - 1][0] + 0.26;
+  const back = R3([B.rx, B.ry, B.rz], ref);
+  poses.push([end, { ...W(), ...back, tw: 0, fx: 0, fl: 0, ...H('grip'), trail: 0 }]);
+  // 다음 클립과는 Animator.wrap 이 이어 줌
+  return clipFromPoses({ name, duration: end, meta: { from: 'open', to: 'open', label: '', blend: 0.05, cancelAt: keys[keys.length - 1][0] + 0.02 }, poses, events: ev });
+}
+const RF_W = [2.458, -0.499, -2.781], RF_M = [1.925, 0.102, 2.834];
+const RB_M = [-0.816, 0.281, -0.454], RB_E = [-0.663, -0.57, -0.528];
+// 정방향: 오른쪽 위로 크게 젖혔다가 화면을 가로질러 왼쪽 아래까지
+KNIFE.slash = slashClip('slash', [
+  [0.07, [0.215, 0.035, -0.33], RF_W, 'o', { ...H('grip', { iB: 1, mB: 1 }) }],
+  [0.12, [0.235, 0.05, -0.325], [RF_W[0] + 0.08, RF_W[1], RF_W[2] - 0.1], 'o'],
+  [0.185, [0.02, -0.055, -0.43], RF_M, 'i', { trail: 1 }],
+  [0.235, [-0.17, -0.13, -0.4], [RF_M[0] + 0.25, RF_M[1] + 0.15, RF_M[2] - 0.55], 'o', { trail: 1 }],
+  [0.3, [-0.185, -0.14, -0.39], [RF_M[0] + 0.3, RF_M[1] + 0.17, RF_M[2] - 0.62], 'o', { trail: 0 }],
+], [sfx(0.12, 'slash', 1), [0.19, 'shake', 0.9]]);
+// 역방향: 왼쪽 아래에서 오른쪽 위로 걷어 올리기
+KNIFE.slash2 = slashClip('slash2', [
+  [0.08, [-0.17, -0.13, -0.4], [RF_M[0] + 0.25, RF_M[1] + 0.15, RF_M[2] - 0.55], 'o', { ...H('grip', { iB: 1, mB: 1 }) }],
+  [0.125, [-0.19, -0.145, -0.39], [RF_M[0] + 0.3, RF_M[1] + 0.17, RF_M[2] - 0.62], 'o'],
+  [0.185, [0.02, -0.05, -0.43], RB_M, 'i', { trail: 1 }],
+  [0.235, [0.19, 0.03, -0.37], RB_E, 'o', { trail: 1 }],
+  [0.3, [0.205, 0.04, -0.36], [RB_E[0] - 0.06, RB_E[1] - 0.05, RB_E[2] - 0.08], 'o', { trail: 0 }],
+], [sfx(0.13, 'slash', 1), [0.19, 'shake', -0.9]]);
 
 KNIFE.leftIdle = clipFromPoses({
   name: 'leftIdle', duration: 1, loop: true,

@@ -1,5 +1,5 @@
 // 설정 메뉴(Esc) – 마우스 감도, 화질(PS1 해상도), 디더, 폴리곤 흔들림, 볼륨
-const DEFAULTS = { sens: 1, res: 240, dither: true, jitter: true, volume: 0.8 };
+const DEFAULTS = { sens: 1, res: 240, dither: true, jitter: true, volume: 0.8, bright: 1.15 };
 const KEY = 'hantang.settings';
 
 export class Settings {
@@ -21,6 +21,8 @@ export class Settings {
           <input id="s-sens" type="range" min="0.2" max="3" step="0.05"></label>
         <label>화면 해상도
           <select id="s-res"><option value="240">240p (PS1 원본 느낌)</option><option value="360">360p</option><option value="480">480p</option><option value="0">원본 해상도</option></select></label>
+        <label>밝기 <output id="o-bri"></output>
+          <input id="s-bri" type="range" min="0.8" max="1.8" step="0.05"></label>
         <label class="chk"><input id="s-dither" type="checkbox"> 디더링(색 번짐)</label>
         <label class="chk"><input id="s-jitter" type="checkbox"> 폴리곤 흔들림 / 텍스처 일그러짐</label>
         <label>볼륨 <output id="o-vol"></output>
@@ -32,13 +34,14 @@ export class Settings {
       $('s-sens').value = this.s.sens; $('o-sens').textContent = (+this.s.sens).toFixed(2);
       $('s-res').value = String(this.s.res);
       $('s-dither').checked = this.s.dither; $('s-jitter').checked = this.s.jitter;
+      $('s-bri').value = this.s.bright; $('o-bri').textContent = Math.round(this.s.bright * 100) + '%';
       $('s-vol').value = this.s.volume; $('o-vol').textContent = Math.round(this.s.volume * 100) + '%';
     };
     sync();
     const upd = () => {
       this.s.sens = +$('s-sens').value; this.s.res = +$('s-res').value;
       this.s.dither = $('s-dither').checked; this.s.jitter = $('s-jitter').checked;
-      this.s.volume = +$('s-vol').value;
+      this.s.volume = +$('s-vol').value; this.s.bright = +$('s-bri').value;
       sync();
       try { localStorage.setItem(KEY, JSON.stringify(this.s)); } catch { /* 저장 불가 환경 */ }
       this.applyFn(this.s);
